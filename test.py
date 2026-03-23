@@ -1,5 +1,6 @@
 import huffman
 import os
+import requests
 
 def test_huffman(file_path, show_codes=True):
     """
@@ -44,14 +45,31 @@ def test_huffman(file_path, show_codes=True):
         else:
             print(f"5. 最终校验: 失败 (数据在压缩/解压过程中受损)")
 
+test_filename = "shakespeare.txt"
 
-# 准备测试数据
-test_filename = "data_test.txt"
-with open(test_filename, "w", encoding='utf-8') as f:
-    # 构造一段具有明显频率分布的文本
-    content = ("AI" * 50) + ("Python" * 30) + ("DataStructure" * 10)
-    f.write(content)
 
-# 生成编码表（可选）
-test_huffman(test_filename, show_codes=True)
+# # 准备测试数据
+# with open(test_filename, "w", encoding='utf-8') as f:
+#     # 构造一段具有明显频率分布的文本
+#     #content = ("AI" * 50) + ("Python" * 30) + ("DataStructure" * 10)
+#     f.write(content)
 
+
+if os.path.exists(test_filename):
+    test_huffman(test_filename, show_codes=False) # 大文件建议关闭编码表显示
+else:
+    print(f"错误：找不到文件 {test_filename}")
+
+
+
+def download_shakespeare(filename="shakespeare.txt"):
+    url = "https://www.gutenberg.org/files/100/100-0.txt"
+    print(f"正在从古登堡计划下载莎士比亚全集...")
+    response = requests.get(url)
+    response.encoding = 'utf-8'
+    with open(filename, "w", encoding='utf-8') as f:
+        f.write(response.text)
+    print(f"下载完成！文件已保存为: {filename}")
+
+# 如果你本地还没有这个文件，运行一次这个函数
+#download_shakespeare()
