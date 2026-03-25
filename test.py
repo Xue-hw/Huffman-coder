@@ -4,10 +4,22 @@ import requests
 from collections import Counter
 
 CONTROL_CHARS = {
-    10: "换行符\\n",
-    13: "回车符\\r",
-    9:  "制表符\\t",
-    32: "空格"
+    0:  "NULL (空)",
+    1:  "SOH (标题开始)",
+    2:  "STX (正文开始)",
+    3:  "ETX (正文结束)",
+    4:  "EOT (传输结束)",
+    7:  "BEL (响铃)",
+    8:  "BS (退格)",
+    9:  "TAB (制表符)",
+    10: "LF (换行符)",
+    11: "VT (垂直制表)",
+    12: "FF (换页)",
+    13: "CR (回车)",
+    26: "EOF (文件结束)",
+    27: "ESC (转义)",
+    32: "SPACE (空格)",
+    127: "DEL (删除)"
 }
 coder = huffman.HuffmanCoder()
 
@@ -33,44 +45,38 @@ def test_huffman_bytes(file_path, show_codes=True):
     if show_codes:
         print(f"\n[状态] 正在为 {file_path} 生成字节映射编码表...")
         print("-" * 50)
-        # 此时 coder.codes 的 key 是整数 (0-255)
+
+        # 此时 char_key 是字符串（字符）
         sorted_codes = sorted(coder.codes.items(), key=lambda x: len(x[1]))
         
-        print(f"{'字节值':<8} | {'可视化':<10} | {'编码长度':<6} | {'哈夫曼编码'}")
+        print(f"{'字符':<8} | {'可视化含义':<15} | {'码长':<6} | {'哈夫曼编码'}")
         print("-" * 50)
         
-        byte_buffer = []  # 用于暂存中文字节碎片
-
-        for byte_val, code in sorted_codes[:60]: # 增加显示行数，因为汉字占3行
+        for char_key, code in sorted_codes[:60]:
             display_char = ""
             
-            if byte_val in CONTROL_CHARS:
-                display_char = CONTROL_CHARS[byte_val]
-                byte_buffer = [] # 遇到非中文字节，清空缓存
-            elif 32 <= byte_val <= 126:
-                display_char = repr(chr(byte_val))
-                byte_buffer = []
-            elif byte_val >= 128:
-                # 进入中文字节处理逻辑
-                byte_buffer.append(byte_val)
-                
-                if len(byte_buffer) < 3:
-                    # 第一或第二个字节，显示提示但不打印汉字
-                    display_char = f"中文字节碎片({hex(byte_val)})"
-                else:
-                    # 凑齐了3个字节，尝试解码
-                    try:
-                        decoded_char = bytes(byte_buffer).decode('utf-8')
-                        display_char = f"汉字成分 ['{decoded_char}']"
-                    except:
-                        display_char = f"字节碎片({hex(byte_val)})"
-                    byte_buffer = [] # 无论成功与否，清空缓存
-            else:
-                display_char = f"控制符({hex(byte_val)})"
-                byte_buffer = []
+            # 获取字符的 Unicode 编码值用于判断
+            try:
+                val = ord(char_key)
+            except TypeError:
+                val = -1 # 防御性编程
 
-            print(f"{byte_val:<8} | {display_char:<15} | {len(code):<8} | {code}")
-            
+            # 1. 处理控制字符
+            if val in CONTROL_CHARS:
+                display_char = CONTROL_CHARS[val]
+            # 2. 处理可见 ASCII 字符
+            elif 32 <= val <= 126:
+                display_char = repr(char_key)
+            # 3. 处理汉字或其他多字节字符
+            elif val > 126:
+                display_char = f"{char_key}"
+            # 4. 其他
+            else:
+                display_char = f"特殊({hex(val) if val != -1 else '?'})"
+
+            # 打印时，Key 处直接显示字符或其十六进制
+            key_show = char_key if val > 32 else f"0x{val:02x}"
+            print(f"{key_show:<8} | {display_char:<15} | {len(code):<8} | {code}")
         if len(sorted_codes) > 30:
             print(f"... 剩余 {len(sorted_codes)-30} 个字节映射已省略 ...")
         print("-" * 50)
@@ -89,9 +95,15 @@ def test_huffman_bytes(file_path, show_codes=True):
     print(f"4. 压缩率:   {(1 - compressed_size/original_size)*100:.2f}%")
     
     # 二进制严格校验
-    with open(file_path, 'rb') as f1, open(decompressed_file, 'rb') as f2:
+    # with open(file_path, 'rb') as f1, open(decompressed_file, 'rb') as f2:
+    #     if f1.read() == f2.read():
+    #         print(f"5. 最终校验: 成功 (字节级完全一致)")
+    #     else:
+    #         print(f"5. 最终校验: 失败 (数据损坏)")
+    with open(file_path, 'r', encoding='utf-8') as f1, \
+     open(decompressed_file, 'r', encoding='utf-8') as f2:
         if f1.read() == f2.read():
-            print(f"5. 最终校验: 成功 (字节级完全一致)")
+            print("5. 最终校验: 成功 (字符级完全一致)")
         else:
             print(f"5. 最终校验: 失败 (数据损坏)")
 
@@ -102,10 +114,6 @@ def debug_specific_word(coder, word="红楼梦"):
         print(f" 字符 '{char}':")
         for b in byte_seq:
             print(f"   字节 {hex(b)} -> 编码: {coder.codes.get(b, '未映射')}")
-
-# 在 if __name__ == "__main__": 块最后调用
-# debug_specific_word(coder, "红楼梦")
-
 
 
 TARGET_FILE = "hongloumeng.txt"  # 可选: "shakespeare.txt", "hongloumeng.txt"
@@ -143,4 +151,4 @@ if __name__ == "__main__":
         # 如果文件很大（大于 1MB），建议关闭编码表显示以防刷屏
         is_large = os.path.getsize(TARGET_FILE) > 1024 * 1024
         test_huffman_bytes(TARGET_FILE)#show_codes=not is_large
-        debug_specific_word(coder, "红楼梦")
+        #debug_specific_word(coder, "Shakespeare")
